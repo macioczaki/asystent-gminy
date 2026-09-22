@@ -1,0 +1,22 @@
+﻿# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Modele AI (za duże dla Git)
+*.gguf
+Modelfile
+
+# Baza wiedzy (dane urzędu – nie commitujemy)
+knowledge_base/
+
+# Sekrety
+appsettings.Development.json
+*.pfx
+*.key
+
+# Logi i backupy
+*.log
+backup*.sql

@@ -90,8 +90,8 @@ bezposrednio do interesariuszy bez weryfikacji przez przelozonego.
 ## 📞 Pomoc techniczna
 
 Problemy z aplikacja zglaszaj do:
-- Informatycy urzedu: [email / telefon]
-- W razie awarii systemu: [email / telefon]
+- Informatycy urzedu: macioczaki@gmail.com
+- W razie awarii systemu: macioczaki@gmail.com
 
 ## 📝 Wskazowki dla efektywnej pracy
 

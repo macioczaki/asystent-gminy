@@ -12,12 +12,24 @@
     <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="8" Margin="16">
 
         <!-- Nagłówek -->
-        <StackPanel Grid.Row="0">
-            <TextBlock Text="Asystent Gminy" FontSize="22" FontWeight="Bold"/>
-            <TextBlock Text="Zadaj pytanie o dokumenty urzędowe"
-                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                       FontSize="12"/>
-        </StackPanel>
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Asystent Gminy" FontSize="22" FontWeight="Bold"/>
+                <TextBlock Text="Zadaj pytanie o dokumenty urzędowe"
+                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                        FontSize="12"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="{Binding UploadStatus}"
+                        VerticalAlignment="Center"
+                        FontSize="11"
+                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                <Button Content="➕ Dodaj dokument"
+                        Command="{Binding PickAndUploadFileCommand}"
+                        IsEnabled="{Binding !IsBusy}"
+                        Padding="12,6"/>
+            </StackPanel>
+        </Grid>
 
         <!-- Lista wiadomości -->
         <ScrollViewer Grid.Row="1"

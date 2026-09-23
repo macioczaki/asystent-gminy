@@ -74,4 +74,32 @@ public class ChatApiClient
             yield return payload;
         }
     }
+    public async Task<string> UploadDocumentAsync(string filePath, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        await using var fileStream = File.OpenRead(filePath);
+        var fileContent = new StreamContent(fileStream);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        form.Add(fileContent, "file", Path.GetFileName(filePath));
+
+        var response = await _http.PostAsync("/api/documents/upload", form, ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            throw new Exception($"API zwróciło {(int)response.StatusCode}: {errorBody}");
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<UploadResponse>(cancellationToken: ct);
+        return result?.Message ?? "Dokument zaindeksowany.";
+    }
+
+    private class UploadResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("message")]
+        public string? Message { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("fileName")]
+        public string? FileName { get; set; }
+    }
 }

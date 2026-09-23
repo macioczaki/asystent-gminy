@@ -25,6 +25,15 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private string _statusText = string.Empty;
 
+    [ObservableProperty]
+    private string _uploadStatus = string.Empty;
+
+    public event Action<string>? CopyToClipboardRequested;
+    public event Action? PickFileRequested;
+
+    // ============================================================
+    // CZAT
+    // ============================================================
     [RelayCommand]
     private async Task AskAsync()
     {
@@ -81,13 +90,59 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
+    // ============================================================
+    // UPLOAD DOKUMENTÓW
+    // ============================================================
+    [RelayCommand]
+    private void PickAndUploadFile()
+    {
+        PickFileRequested?.Invoke();
+    }
+
+    public async Task UploadFileAsync(string filePath)
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        UploadStatus = $"⏳ Indeksuję: {System.IO.Path.GetFileName(filePath)}...";
+
+        try
+        {
+            var message = await _api.UploadDocumentAsync(filePath);
+            UploadStatus = $"✅ {message}";
+        }
+        catch (Exception ex)
+        {
+            UploadStatus = $"❌ Błąd: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+
+            _ = Task.Delay(TimeSpan.FromSeconds(5)).ContinueWith(_ =>
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => UploadStatus = string.Empty);
+            });
+        }
+    }
+
+    // ============================================================
+    // KOPIOWANIE
+    // ============================================================
+    [RelayCommand]
+    private void CopyMessage(string? content)
+    {
+        if (string.IsNullOrEmpty(content)) return;
+        CopyToClipboardRequested?.Invoke(content);
+    }
+
+    // ============================================================
+    // CZYSZCZENIE ARTEFAKTÓW
+    // ============================================================
     private static string StripArtifacts(string text)
     {
-        // 1. Usuń znaczniki <|...|>
         var cleaned = System.Text.RegularExpressions.Regex.Replace(
             text, @"<\|[^|]*\|>", string.Empty);
 
-        // 2. Usuń osierocone słowa-role z początku i końca
         cleaned = System.Text.RegularExpressions.Regex.Replace(
             cleaned, @"^\s*(system|user|assistant)\s*", string.Empty,
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -96,25 +151,14 @@ public partial class MainViewModel : ViewModelBase
             cleaned, @"\s*(system|user|assistant)\s*$", string.Empty,
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-        // 3. Usuń znaczniki Markdown: **bold**, *italic*, `code`, # nagłówki
         cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\*\*(.+?)\*\*", "$1");
         cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\*(.+?)\*", "$1");
         cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"`(.+?)`", "$1");
         cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"^#{1,6}\s+", string.Empty,
             System.Text.RegularExpressions.RegexOptions.Multiline);
 
-        // 4. Normalizuj spacje i tabulatory, ZACHOWAJ newline
         cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"[ \t]+", " ");
 
         return cleaned.Trim();
     }
-
-    [RelayCommand]
-    private void CopyMessage(string? content)
-    {
-        if (string.IsNullOrEmpty(content)) return;
-        CopyToClipboardRequested?.Invoke(content);
-    }
-
-    public event Action<string>? CopyToClipboardRequested;
 }

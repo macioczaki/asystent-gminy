@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Specialized;
+using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using AsystentGminy.Desktop.ViewModels;
 
@@ -26,7 +29,36 @@ public partial class MainWindow : Window
                 await clipboard.SetTextAsync(content);
         };
 
+        vm.PickFileRequested += async () => await PickAndUploadAsync(vm);
+
         vm.Messages.CollectionChanged += OnMessagesChanged;
+    }
+
+    private async Task PickAndUploadAsync(MainViewModel vm)
+    {
+        var topLevel = GetTopLevel(this);
+        if (topLevel is null) return;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Wybierz dokument PDF",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Pliki PDF")
+                {
+                    Patterns = new[] { "*.pdf" }
+                }
+            }
+        });
+
+        var file = files.FirstOrDefault();
+        if (file is null) return;
+
+        var path = file.TryGetLocalPath();
+        if (string.IsNullOrEmpty(path)) return;
+
+        await vm.UploadFileAsync(path);
     }
 
     private void OnMessagesChanged(object? sender, NotifyCollectionChangedEventArgs e)

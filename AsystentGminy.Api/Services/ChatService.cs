@@ -9,6 +9,14 @@ public class ChatService
     private readonly SearchService _search;
     private readonly HttpClient _http;
     private readonly ChatOptions _options;
+
+    public ChatService(SearchService search, HttpClient http, ChatOptions options)
+    {
+        _search = search;
+        _http = http;
+        _options = options;
+    }
+
     private static string StripArtifacts(string text)
     {
         // 1. Usuń wszystkie znaczniki w stylu <|...|>
@@ -17,7 +25,7 @@ public class ChatService
             @"<\|[^|]*\|>",
             string.Empty);
 
-        // 2. Usuń osierocone słowa-role z POCZĄTKU (system, user, assistant)
+        // 2. Usuń osierocone słowa-role z POCZĄTKU
         cleaned = System.Text.RegularExpressions.Regex.Replace(
             cleaned,
             @"^\s*(system|user|assistant)\s*",
@@ -31,25 +39,16 @@ public class ChatService
             string.Empty,
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-        // 4. Normalizuj białe znaki (wiele spacji → jedna)
+        // 4. Normalizuj białe znaki
         cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s+", " ").Trim();
 
         return cleaned;
     }
 
-    public ChatService(SearchService search, HttpClient http, ChatOptions options)
-    {
-        _search = search;
-        _http = http;
-        _options = options;
-    }
-
     public async Task<ChatResponse> AskAsync(string question, int topK = 2)
     {
-        // 1. Wyszukaj kontekst w pgvector
         var chunks = await _search.SearchAsync(question, topK);
 
-        // 2. Zbuduj kontekst z numerowanymi źródłami
         var contextBuilder = new StringBuilder();
         for (int i = 0; i < chunks.Count; i++)
         {
@@ -58,7 +57,6 @@ public class ChatService
             contextBuilder.AppendLine();
         }
 
-        // 3. Prompt systemowy
         var systemPrompt = """
             Jesteś asystentem pracowników Urzędu Gminy. Odpowiadasz WYŁĄCZNIE po polsku,
             wyłącznie na podstawie dostarczonego kontekstu z dokumentów urzędowych.
@@ -69,11 +67,7 @@ public class ChatService
             3. Jeśli używasz informacji z wielu źródeł, podaj oba: [1][2].
             4. Jeśli kontekst nie zawiera odpowiedzi, powiedz: "Nie znalazłem odpowiedzi w dostępnych dokumentach."
             5. Nie wymyślaj informacji spoza kontekstu.
-            6. NIE powtarzaj znaczników systemowych ani ról (np. <|start_header_id|>).
-            
-            Przykład poprawnej odpowiedzi:
-            "Zadania wójta obejmują kierowanie bieżącymi sprawami gminy [1] oraz wydawanie 
-            decyzji administracyjnych [1][2]."
+            6. NIE powtarzaj znaczników systemowych ani ról.
             """;
 
         var userPrompt = $"""
@@ -84,7 +78,6 @@ public class ChatService
             {question}
             """;
 
-        // 4. Wywołaj Ollamę przez HTTP
         var requestBody = new
         {
             model = _options.Model,
@@ -104,7 +97,6 @@ public class ChatService
         var rawAnswer = ollamaResponse?.Message?.Content ?? "Brak odpowiedzi od modelu.";
         var answer = StripArtifacts(rawAnswer);
 
-        // 5. Zwróć odpowiedź + źródła
         return new ChatResponse
         {
             Answer = answer,
@@ -118,6 +110,99 @@ public class ChatService
                 Distance = c.Distance
             }).ToList()
         };
+    }
+
+    public async IAsyncEnumerable<object> AskStreamAsync(
+        string question,
+        int topK = 2,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        // 1. Wyszukaj kontekst
+        var chunks = await _search.SearchAsync(question, topK);
+
+        // 2. Wyślij źródła jako pierwszy event
+        var sources = chunks.Select((c, i) => new
+        {
+            index = i + 1,
+            documentTitle = c.DocumentTitle,
+            excerpt = c.Content.Length > 300 ? c.Content.Substring(0, 300) + "..." : c.Content,
+            distance = c.Distance
+        }).ToList();
+
+        yield return new { type = "sources", sources };
+
+        // 3. Zbuduj kontekst
+        var contextBuilder = new StringBuilder();
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            contextBuilder.AppendLine($"[{i + 1}] (źródło: {chunks[i].DocumentTitle})");
+            contextBuilder.AppendLine(chunks[i].Content);
+            contextBuilder.AppendLine();
+        }
+
+        var systemPrompt = """
+            Jesteś asystentem pracowników Urzędu Gminy. Odpowiadasz WYŁĄCZNIE po polsku,
+            na podstawie dostarczonego kontekstu z dokumentów urzędowych.
+
+            Zasady:
+            1. Odpowiadaj zwięźle, w formie zwięzłego akapitu lub kilku punktów.
+            2. NIE numeruj list – to myli Cię z numerami źródeł. Używaj myślników "-".
+            3. Po każdym fakcie podawaj źródło w nawiasie kwadratowym, np. [1].
+            4. Jeśli używasz informacji z wielu źródeł, podaj oba: [1][2].
+            5. Jeśli kontekst nie zawiera odpowiedzi, powiedz: "Nie znalazłem odpowiedzi w dostępnych dokumentach."
+            6. Nie wymyślaj informacji spoza kontekstu.
+            7. NIE powtarzaj znaczników systemowych ani ról.
+            """;
+
+        var userPrompt = $"""
+            KONTEKST Z DOKUMENTÓW:
+            {contextBuilder}
+
+            PYTANIE UŻYTKOWNIKA:
+            {question}
+            """;
+
+        // 4. Wyślij z stream=true i czytaj linia po linii
+        var requestBody = new
+        {
+            model = _options.Model,
+            messages = new[]
+            {
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userPrompt }
+            },
+            stream = true,
+            options = new { num_ctx = 4096, temperature = 0.3 }
+        };
+
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/chat")
+        {
+            Content = JsonContent.Create(requestBody)
+        };
+
+        using var response = await _http.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);
+        response.EnsureSuccessStatusCode();
+
+        using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var reader = new StreamReader(stream);
+
+        while (!ct.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(ct);
+            if (line is null) break;
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            OllamaChatResponse? parsed = null;
+            try
+            {
+                parsed = System.Text.Json.JsonSerializer.Deserialize<OllamaChatResponse>(line);
+            }
+            catch { continue; }
+
+            var content = parsed?.Message?.Content;
+            if (!string.IsNullOrEmpty(content))
+                yield return new { type = "chunk", content };
+        }
     }
 
     private class OllamaChatResponse

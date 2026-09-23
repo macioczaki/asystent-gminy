@@ -43,6 +43,7 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
+// Endpoint klasyczny (bez streamingu) – zwraca całą odpowiedź naraz
 app.MapPost("/api/chat", async (ChatRequest request, ChatService chat) =>
 {
     if (string.IsNullOrWhiteSpace(request.Question))
@@ -59,6 +60,39 @@ app.MapPost("/api/chat", async (ChatRequest request, ChatService chat) =>
             detail: ex.Message,
             title: "Błąd generowania odpowiedzi",
             statusCode: 500);
+    }
+});
+
+// Endpoint streamingowy (SSE) – zwraca odpowiedź fragment po fragmencie
+app.MapPost("/api/chat/stream", async (ChatRequest request, ChatService chat, HttpContext context, CancellationToken ct) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Question))
+    {
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsJsonAsync(new { error = "Pytanie nie może być puste." }, ct);
+        return;
+    }
+
+    context.Response.Headers.ContentType = "text/event-stream";
+    context.Response.Headers.CacheControl = "no-cache";
+    context.Response.Headers.Connection = "keep-alive";
+
+    try
+    {
+        await foreach (var evt in chat.AskStreamAsync(request.Question, topK: 2, ct))
+        {
+            var payload = System.Text.Json.JsonSerializer.Serialize(evt);
+            await context.Response.WriteAsync($"data: {payload}\n\n", ct);
+            await context.Response.Body.FlushAsync(ct);
+        }
+
+        await context.Response.WriteAsync("data: [DONE]\n\n", ct);
+        await context.Response.Body.FlushAsync(ct);
+    }
+    catch (Exception ex)
+    {
+        var payload = System.Text.Json.JsonSerializer.Serialize(new { type = "error", message = ex.Message });
+        await context.Response.WriteAsync($"data: {payload}\n\n", ct);
     }
 });
 

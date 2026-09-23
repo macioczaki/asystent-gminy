@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AsystentGminy.Desktop.Models;
 
@@ -21,11 +22,17 @@ public class SourceReference
     public double Distance { get; set; }
 }
 
-public class ChatMessage
+public partial class ChatMessage : ObservableObject
 {
-    public string Role { get; set; } = string.Empty;   // "user" lub "assistant"
-    public string Content { get; set; } = string.Empty;
-    public List<SourceReference> Sources { get; set; } = new();
+    [ObservableProperty]
+    private string _role = string.Empty;
+
+    [ObservableProperty]
+    private string _content = string.Empty;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSources))]
+    private List<SourceReference> _sources = new();
 
     public bool IsUser => Role == "user";
     public bool HasSources => Sources.Count > 0;

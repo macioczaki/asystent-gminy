@@ -31,6 +31,7 @@ public partial class MainWindow : Window
         };
 
         vm.PickFileRequested += async () => await PickAndUploadAsync(vm);
+        vm.SaveFileRequested += async (suggestedName) => await PickSaveLocationAsync(suggestedName);
 
         vm.Messages.CollectionChanged += OnMessagesChanged;
     }
@@ -60,6 +61,29 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(path)) return;
 
         await vm.UploadFileAsync(path);
+    }
+
+    private async Task<string?> PickSaveLocationAsync(string suggestedName)
+    {
+        var topLevel = GetTopLevel(this);
+        if (topLevel is null) return null;
+
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Zapisz rozmowę jako PDF",
+            SuggestedFileName = suggestedName,
+            DefaultExtension = "pdf",
+            FileTypeChoices = new[]
+            {
+                new FilePickerFileType("Dokument PDF")
+                {
+                    Patterns = new[] { "*.pdf" }
+                }
+            }
+        });
+
+        if (file is null) return null;
+        return file.TryGetLocalPath();
     }
 
     private void OnMessagesChanged(object? sender, NotifyCollectionChangedEventArgs e)

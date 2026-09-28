@@ -95,6 +95,10 @@
                                VerticalAlignment="Center"
                                FontSize="11"
                                Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                    <Button Content="📄 Eksportuj PDF"
+                            Command="{Binding ExportConversationCommand}"
+                            IsEnabled="{Binding !IsBusy}"
+                            Padding="12,6"/>
                     <Button Content="📁 Dokumenty"
                             Click="OpenDocumentsClick"
                             Padding="12,6"/>
@@ -113,7 +117,6 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:ChatMessage">
                             <Grid Margin="0,6">
-                                <!-- User -->
                                 <Border HorizontalAlignment="Right"
                                         MaxWidth="600"
                                         Padding="14,10"
@@ -136,7 +139,6 @@
                                     </StackPanel>
                                 </Border>
 
-                                <!-- Assistant -->
                                 <Border HorizontalAlignment="Left"
                                         MaxWidth="700"
                                         Padding="14,10"

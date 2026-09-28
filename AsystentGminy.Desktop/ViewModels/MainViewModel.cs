@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using AsystentGminy.Desktop.Models;
@@ -13,6 +14,7 @@ namespace AsystentGminy.Desktop.ViewModels;
 public partial class MainViewModel : ViewModelBase
 {
     private readonly ChatApiClient _api = new();
+    private readonly PdfExportService _pdf = new();
 
     public ObservableCollection<ChatMessage> Messages { get; } = new();
     public ObservableCollection<ConversationDto> Conversations { get; } = new();
@@ -37,6 +39,7 @@ public partial class MainViewModel : ViewModelBase
 
     public event Action<string>? CopyToClipboardRequested;
     public event Action? PickFileRequested;
+    public event Func<string, Task<string?>>? SaveFileRequested;
 
     public MainViewModel()
     {
@@ -214,6 +217,51 @@ public partial class MainViewModel : ViewModelBase
             IsBusy = false;
             StatusText = string.Empty;
         }
+    }
+
+    // ============================================================
+    // EKSPORT PDF
+    // ============================================================
+    [RelayCommand]
+    private async Task ExportConversation()
+    {
+        if (Messages.Count == 0)
+        {
+            StatusText = "Brak wiadomości do wyeksportowania.";
+            return;
+        }
+
+        var title = CurrentConversationId is null
+            ? "Nowa rozmowa"
+            : Conversations.FirstOrDefault(c => c.Id == CurrentConversationId)?.Title ?? "Rozmowa";
+
+        var suggestedName = SanitizeFileName($"{title}_{DateTime.Now:yyyy-MM-dd_HH-mm}.pdf");
+
+        if (SaveFileRequested is null) return;
+        var path = await SaveFileRequested(suggestedName);
+        if (string.IsNullOrEmpty(path)) return;
+
+        try
+        {
+            _pdf.ExportConversation(path, title, Messages.ToList());
+            StatusText = $"✅ Zapisano PDF: {System.IO.Path.GetFileName(path)}";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"❌ Błąd eksportu: {ex.Message}";
+        }
+
+        _ = Task.Delay(TimeSpan.FromSeconds(5)).ContinueWith(_ =>
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => StatusText = string.Empty);
+        });
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        var invalid = System.IO.Path.GetInvalidFileNameChars();
+        var cleaned = new string(name.Where(c => !invalid.Contains(c)).ToArray());
+        return cleaned.Length > 100 ? cleaned.Substring(0, 100) : cleaned;
     }
 
     // ============================================================

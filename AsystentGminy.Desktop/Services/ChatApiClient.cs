@@ -43,9 +43,14 @@ public class ChatApiClient
     // ────────────────────────────────────────────────────────────
     public async IAsyncEnumerable<string> AskStreamAsync(
         string question,
+        Guid? conversationId = null,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var request = new ChatRequest { Question = question };
+        var request = new ChatRequest 
+        { 
+            Question = question, 
+            ConversationId = conversationId 
+        };
         var json = JsonSerializer.Serialize(request);
         var content = new StringContent(json, Encoding.UTF8, "application/json");
 
@@ -92,6 +97,80 @@ public class ChatApiClient
 
         var result = await response.Content.ReadFromJsonAsync<UploadResponse>(cancellationToken: ct);
         return result?.Message ?? "Dokument zaindeksowany.";
+    }
+    public async Task<List<DocumentDto>> GetDocumentsAsync(CancellationToken ct = default)
+    {
+        var response = await _http.GetAsync("/api/documents", ct);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<List<DocumentDto>>(
+            cancellationToken: ct);
+
+        return result ?? new List<DocumentDto>();
+    }
+
+    public async Task DeleteDocumentAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await _http.DeleteAsync($"/api/documents/{id}", ct);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            throw new Exception($"API zwróciło {(int)response.StatusCode}: {errorBody}");
+        }
+    }
+
+    public async Task<List<ConversationDto>> GetConversationsAsync(CancellationToken ct = default)
+    {
+        var response = await _http.GetAsync("/api/conversations", ct);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<List<ConversationDto>>(
+            cancellationToken: ct);
+
+        return result ?? new List<ConversationDto>();
+    }
+
+    public async Task<Guid> CreateConversationAsync(string title, CancellationToken ct = default)
+    {
+        var request = new { title };
+        var response = await _http.PostAsJsonAsync("/api/conversations", request, ct);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<CreateConversationResponse>(
+            cancellationToken: ct);
+
+        if (result is null)
+            throw new Exception("API nie zwróciło ID rozmowy.");
+
+        return result.Id;
+    }
+
+    public async Task<ConversationDetailsDto?> GetConversationAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await _http.GetAsync($"/api/conversations/{id}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadFromJsonAsync<ConversationDetailsDto>(
+            cancellationToken: ct);
+    }
+
+    public async Task DeleteConversationAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await _http.DeleteAsync($"/api/conversations/{id}", ct);
+        response.EnsureSuccessStatusCode();
+    }
+
+    private class CreateConversationResponse
+    {
+        [System.Text.Json.Serialization.JsonPropertyName("id")]
+        public Guid Id { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("title")]
+        public string? Title { get; set; }
     }
 
     private class UploadResponse

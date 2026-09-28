@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using AsystentGminy.Desktop.ViewModels;
@@ -68,5 +69,14 @@ public partial class MainWindow : Window
             var scrollViewer = this.FindControl<ScrollViewer>("MessageScrollViewer");
             scrollViewer?.ScrollToEnd();
         }, DispatcherPriority.Background);
+    }
+
+    private void OpenDocumentsClick(object? sender, RoutedEventArgs e)
+    {
+        var window = new DocumentsWindow
+        {
+            DataContext = new DocumentsViewModel()
+        };
+        window.ShowDialog(this);
     }
 }

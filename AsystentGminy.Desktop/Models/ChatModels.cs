@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -6,6 +7,7 @@ namespace AsystentGminy.Desktop.Models;
 public class ChatRequest
 {
     public string Question { get; set; } = string.Empty;
+    public Guid? ConversationId { get; set; }
 }
 
 public class ChatResponse

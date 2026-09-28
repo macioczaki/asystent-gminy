@@ -3,152 +3,223 @@
         xmlns:vm="using:AsystentGminy.Desktop.ViewModels"
         xmlns:models="using:AsystentGminy.Desktop.Models"
         x:Class="AsystentGminy.Desktop.Views.MainWindow"
+        x:Name="Root"
         x:DataType="vm:MainViewModel"
         Title="Asystent Gminy"
-        Width="900" Height="700"
+        Width="1200" Height="750"
         WindowStartupLocation="CenterScreen"
         RequestedThemeVariant="Default">
 
-    <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="8" Margin="16">
+    <Grid ColumnDefinitions="280,*">
 
-        <!-- Nagłówek -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-            <StackPanel Grid.Column="0">
-                <TextBlock Text="Asystent Gminy" FontSize="22" FontWeight="Bold"/>
-                <TextBlock Text="Zadaj pytanie o dokumenty urzędowe"
-                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                        FontSize="12"/>
+        <!-- PANEL BOCZNY -->
+        <Border Grid.Column="0"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="0,0,1,0"
+                IsVisible="{Binding IsSidebarOpen}">
+            <Grid RowDefinitions="Auto,*,Auto" Margin="12">
+
+                <Button Grid.Row="0"
+                        Content="➕ Nowa rozmowa"
+                        Command="{Binding NewConversationCommand}"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Padding="12,10"
+                        Margin="0,0,0,12"
+                        FontWeight="SemiBold"/>
+
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Conversations}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:ConversationDto">
+                                <Border Margin="0,2" Padding="4" CornerRadius="6">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <Button Grid.Column="0"
+                                                Content="{Binding Title}"
+                                                Command="{Binding #Root.((vm:MainViewModel)DataContext).OpenConversationCommand}"
+                                                CommandParameter="{Binding}"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Left"
+                                                Background="Transparent"
+                                                Padding="6,4"
+                                                FontSize="13"/>
+                                        <Button Grid.Column="1"
+                                                Content="🗑"
+                                                Command="{Binding #Root.((vm:MainViewModel)DataContext).DeleteConversationCommand}"
+                                                CommandParameter="{Binding}"
+                                                Background="Transparent"
+                                                Padding="6,4"
+                                                FontSize="12"
+                                                ToolTip.Tip="Usuń rozmowę"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <Button Grid.Row="2"
+                        Content="🔄 Odśwież listę"
+                        Command="{Binding LoadConversationsCommand}"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Padding="8,6"
+                        Margin="0,12,0,0"
+                        FontSize="11"/>
+            </Grid>
+        </Border>
+
+        <!-- GŁÓWNY OBSZAR -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="8" Margin="16">
+
+            <!-- Nagłówek -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+                <Button Grid.Column="0"
+                        Content="☰"
+                        Command="{Binding ToggleSidebarCommand}"
+                        Padding="10,6"
+                        Margin="0,0,12,0"
+                        FontSize="16"
+                        ToolTip.Tip="Pokaż/ukryj panel rozmów"/>
+
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Asystent Gminy" FontSize="22" FontWeight="Bold"/>
+                    <TextBlock Text="Zadaj pytanie o dokumenty urzędowe"
+                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                               FontSize="12"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding UploadStatus}"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                    <Button Content="📁 Dokumenty"
+                            Click="OpenDocumentsClick"
+                            Padding="12,6"/>
+                    <Button Content="➕ Dodaj dokument"
+                            Command="{Binding PickAndUploadFileCommand}"
+                            IsEnabled="{Binding !IsBusy}"
+                            Padding="12,6"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Lista wiadomości -->
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          x:Name="MessageScrollViewer">
+                <ItemsControl ItemsSource="{Binding Messages}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:ChatMessage">
+                            <Grid Margin="0,6">
+                                <!-- User -->
+                                <Border HorizontalAlignment="Right"
+                                        MaxWidth="600"
+                                        Padding="14,10"
+                                        CornerRadius="12"
+                                        Background="{DynamicResource SystemAccentColor}"
+                                        IsVisible="{Binding IsUser}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Content}"
+                                                   TextWrapping="Wrap"
+                                                   Foreground="White"/>
+                                        <Button Content="Kopiuj"
+                                                FontSize="10"
+                                                Padding="6,2"
+                                                Margin="0,6,0,0"
+                                                HorizontalAlignment="Right"
+                                                Background="Transparent"
+                                                Foreground="White"
+                                                Command="{Binding #Root.((vm:MainViewModel)DataContext).CopyMessageCommand}"
+                                                CommandParameter="{Binding Content}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Assistant -->
+                                <Border HorizontalAlignment="Left"
+                                        MaxWidth="700"
+                                        Padding="14,10"
+                                        CornerRadius="12"
+                                        Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
+                                        BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                                        BorderThickness="1"
+                                        IsVisible="{Binding !IsUser}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Content}" TextWrapping="Wrap"/>
+                                        <Button Content="Kopiuj"
+                                                FontSize="10"
+                                                Padding="6,2"
+                                                Margin="0,6,0,0"
+                                                HorizontalAlignment="Left"
+                                                Background="Transparent"
+                                                Command="{Binding #Root.((vm:MainViewModel)DataContext).CopyMessageCommand}"
+                                                CommandParameter="{Binding Content}"/>
+
+                                        <ItemsControl ItemsSource="{Binding Sources}"
+                                                      IsVisible="{Binding HasSources}"
+                                                      Margin="0,10,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="models:SourceReference">
+                                                    <Border Margin="0,3"
+                                                            Padding="10"
+                                                            CornerRadius="6"
+                                                            Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+                                                        <StackPanel>
+                                                            <TextBlock FontSize="11"
+                                                                       FontWeight="Bold"
+                                                                       Foreground="{DynamicResource SystemAccentColor}">
+                                                                <Run Text="["/><Run Text="{Binding Index}"/><Run Text="] "/>
+                                                                <Run Text="{Binding DocumentTitle}"/>
+                                                            </TextBlock>
+                                                            <TextBlock Text="{Binding Excerpt}"
+                                                                       TextWrapping="Wrap"
+                                                                       FontSize="11"
+                                                                       Margin="0,4,0,0"
+                                                                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Status -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8"
+                        IsVisible="{Binding IsBusy}"
+                        Margin="4,0,0,0">
+                <TextBlock Text="⏳" FontSize="14"/>
+                <TextBlock Text="{Binding StatusText}"
+                           FontStyle="Italic"
+                           FontSize="12"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
             </StackPanel>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <TextBlock Text="{Binding UploadStatus}"
-                        VerticalAlignment="Center"
-                        FontSize="11"
-                        Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
-                <Button Content="➕ Dodaj dokument"
-                        Command="{Binding PickAndUploadFileCommand}"
+
+            <!-- Pole pytania -->
+            <Grid Grid.Row="3" ColumnDefinitions="*,Auto">
+                <TextBox Text="{Binding Question}"
+                         PlaceholderText="Zadaj pytanie, np. Jakie zadania realizuje wójt gminy?"
+                         IsEnabled="{Binding !IsBusy}"
+                         FontSize="14"
+                         Padding="10,8">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding AskCommand}"/>
+                    </TextBox.KeyBindings>
+                </TextBox>
+                <Button Grid.Column="1"
+                        Content="Wyślij"
+                        Command="{Binding AskCommand}"
                         IsEnabled="{Binding !IsBusy}"
-                        Padding="12,6"/>
-            </StackPanel>
-        </Grid>
-
-        <!-- Lista wiadomości -->
-        <ScrollViewer Grid.Row="1"
-                      VerticalScrollBarVisibility="Auto"
-                      x:Name="MessageScrollViewer">
-            <ItemsControl ItemsSource="{Binding Messages}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:ChatMessage">
-                        <Grid Margin="0,6">
-                            <!-- User: wyrównanie do prawej -->
-                            <Border HorizontalAlignment="Right"
-                                    MaxWidth="600"
-                                    Padding="14,10"
-                                    CornerRadius="12"
-                                    Background="{DynamicResource SystemAccentColor}"
-                                    IsVisible="{Binding IsUser}">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Content}"
-                                               TextWrapping="Wrap"
-                                               Foreground="White"/>
-                                    <Button Content="Kopiuj"
-                                            FontSize="10"
-                                            Padding="6,2"
-                                            Margin="0,6,0,0"
-                                            HorizontalAlignment="Right"
-                                            Background="Transparent"
-                                            Foreground="White"
-                                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CopyMessageCommand}"
-                                            CommandParameter="{Binding Content}"/>
-                                </StackPanel>
-                            </Border>
-
-                            <!-- Assistant: wyrównanie do lewej -->
-                            <Border HorizontalAlignment="Left"
-                                    MaxWidth="700"
-                                    Padding="14,10"
-                                    CornerRadius="12"
-                                    Background="{DynamicResource SystemControlBackgroundAltHighBrush}"
-                                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
-                                    BorderThickness="1"
-                                    IsVisible="{Binding !IsUser}">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Content}"
-                                               TextWrapping="Wrap"/>
-
-                                    <!-- Przycisk Kopiuj -->
-                                    <Button Content="Kopiuj"
-                                            FontSize="10"
-                                            Padding="6,2"
-                                            Margin="0,6,0,0"
-                                            HorizontalAlignment="Left"
-                                            Background="Transparent"
-                                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CopyMessageCommand}"
-                                            CommandParameter="{Binding Content}"/>
-
-                                    <!-- Źródła -->
-                                    <ItemsControl ItemsSource="{Binding Sources}"
-                                                  IsVisible="{Binding HasSources}"
-                                                  Margin="0,10,0,0">
-                                        <ItemsControl.ItemTemplate>
-                                            <DataTemplate x:DataType="models:SourceReference">
-                                                <Border Margin="0,3"
-                                                        Padding="10"
-                                                        CornerRadius="6"
-                                                        Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
-                                                    <StackPanel>
-                                                        <TextBlock FontSize="11"
-                                                                   FontWeight="Bold"
-                                                                   Foreground="{DynamicResource SystemAccentColor}">
-                                                            <Run Text="["/><Run Text="{Binding Index}"/><Run Text="] "/>
-                                                            <Run Text="{Binding DocumentTitle}"/>
-                                                        </TextBlock>
-                                                        <TextBlock Text="{Binding Excerpt}"
-                                                                   TextWrapping="Wrap"
-                                                                   FontSize="11"
-                                                                   Margin="0,4,0,0"
-                                                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
-
-        <!-- Wskaźnik "Pisze..." -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8"
-                    IsVisible="{Binding IsBusy}"
-                    Margin="4,0,0,0">
-            <TextBlock Text="⏳" FontSize="14"/>
-            <TextBlock Text="{Binding StatusText}"
-                       FontStyle="Italic"
-                       FontSize="12"
-                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"/>
-        </StackPanel>
-
-        <!-- Pole pytania -->
-        <Grid Grid.Row="3" ColumnDefinitions="*,Auto">
-            <TextBox Text="{Binding Question}"
-                     PlaceholderText="Zadaj pytanie, np. Jakie zadania realizuje wójt gminy?"
-                     IsEnabled="{Binding !IsBusy}"
-                     FontSize="14"
-                     Padding="10,8">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding AskCommand}"/>
-                </TextBox.KeyBindings>
-            </TextBox>
-            <Button Grid.Column="1"
-                    Content="Wyślij"
-                    Command="{Binding AskCommand}"
-                    IsEnabled="{Binding !IsBusy}"
-                    Margin="8,0,0,0"
-                    Padding="24,8"
-                    FontWeight="SemiBold"/>
+                        Margin="8,0,0,0"
+                        Padding="24,8"
+                        FontWeight="SemiBold"/>
+            </Grid>
         </Grid>
     </Grid>
 </Window>

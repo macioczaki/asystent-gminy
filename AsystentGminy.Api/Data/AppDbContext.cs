@@ -7,6 +7,8 @@ public class AppDbContext : DbContext
 {
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<Chunk> Chunks => Set<Chunk>();
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<Message> Messages => Set<Message>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
     {
@@ -40,6 +42,29 @@ public class AppDbContext : DbContext
             e.HasOne(x => x.Document)
                 .WithMany(d => d.Chunks)
                 .HasForeignKey(x => x.DocumentId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Conversation>(e =>
+        {
+            e.ToTable("conversations");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Title).HasColumnName("title");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        });
+
+        modelBuilder.Entity<Message>(e =>
+        {
+            e.ToTable("messages");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Role).HasColumnName("role");
+            e.Property(x => x.Content).HasColumnName("content");
+            e.Property(x => x.SourcesJson).HasColumnName("sources_json");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at");
+            e.HasOne(x => x.Conversation)
+                .WithMany(c => c.Messages)
+                .HasForeignKey(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

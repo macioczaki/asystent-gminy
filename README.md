@@ -1,4 +1,11 @@
 ﻿# Asystent Gminy
+![.NET](https://img.shields.io/badge/.NET-10.0_LTS-512BD4?logo=dotnet&logoColor=white)
+![Avalonia](https://img.shields.io/badge/Avalonia-12.1-8B44AC?logo=avalonia&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)
+![pgvector](https://img.shields.io/badge/pgvector-0.8.6-4169E1)
+![Ollama](https://img.shields.io/badge/Ollama-Bielik_4.5B-000000?logo=ollama&logoColor=white)
+![License](https://img.shields.io/badge/license-Wewn%C4%99trzna-lightgrey)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)
 
 Lokalny asystent AI dla pracowników Urzędu Gminy. Odpowiada na pytania 
 o dokumenty urzędowe (uchwały, regulaminy, ustawy) w języku naturalnym,
@@ -21,6 +28,26 @@ informacje nie są wysyłane do chmury.
 
 ---
 
+## 🎯 Dlaczego ten projekt?
+
+Pracownicy urzędów gmin codziennie tracą godziny na wyszukiwanie informacji 
+w dziesiątkach dokumentów – uchwałach, regulaminach, ustawach. Odpowiedź na proste 
+pytanie typu *„Jakie zadania realizuje wójt gminy?"* wymaga przekopania się przez 
+setki stron PDF-ów, często dostępnych wyłącznie jako **skany wymagające OCR**.
+
+**Asystent Gminy** rozwiązuje ten problem:
+
+- **Odpowiada w sekundach** zamiast minut – w języku naturalnym, po polsku.
+- **Cytuje źródła** – każda informacja ma numer dokumentu, z którego pochodzi.
+- **Działa lokalnie** – dane nie opuszczają serwera urzędu, zgodnie z RODO.
+- **Obsługuje skany** – OCR (Tesseract) przetwarza dokumenty bez warstwy tekstowej.
+- **Jest prosty w użyciu** – aplikacja desktopowa, bez konieczności szkoleń.
+
+Projekt został wdrożony w Urzędzie Gminy [nazwa] i obsługuje [X] dokumentów 
+oraz [Y] pracowników.
+
+---
+
 ## ✨ Funkcje
 
 - 💬 **Czat w języku naturalnym** – pytania po polsku, odpowiedzi po polsku
@@ -35,9 +62,67 @@ informacje nie są wysyłane do chmury.
 
 ## 🏗️ Architektura
 
-Aplikacja desktop (Avalonia) komunikuje się przez HTTP z API (ASP.NET Core),
-które korzysta z bazy PostgreSQL + pgvector oraz lokalnego modelu Bielik
-uruchomionego przez Ollamę. Wszystko działa on-premise.
+System składa się z trzech niezależnych projektów .NET 10 oraz bazy danych z rozszerzeniem wektorowym:
+
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │  APLIKACJA DESKTOPOWA (Avalonia 12 / .NET 10)                          │
+    │  ┌───────────────────────────────────────────────────────────────────┐  │
+    │  │  Widoki (MVVM)  →  MainViewModel  →  ChatApiClient (HTTP)        │  │
+    │  │  • Czat w języku naturalnym         • Eksport rozmowy do PDF      │  │
+    │  │  • Panel administracyjny            • Upload dokumentów PDF       │  │
+    │  │  • Historia rozmów                  • Streaming odpowiedzi (SSE)  │  │
+    │  └───────────────────────────────────────────────────────────────────┘  │
+    └─────────────────────────────────┬───────────────────────────────────────┘
+                                      │ HTTP / SSE
+    ┌─────────────────────────────────▼───────────────────────────────────────┐
+    │  API (ASP.NET Core / .NET 10)                                          │
+    │  ┌───────────────────────────────────────────────────────────────────┐  │
+    │  │  Endpointy:                          Serwisy:                      │  │
+    │  │  • POST /api/chat                    • ChatService (RAG)          │  │
+    │  │  • POST /api/chat/stream             • SearchService (pgvector)   │  │
+    │  │  • POST /api/documents/upload        • IngestionService (OCR)     │  │
+    │  │  • GET  /api/documents               • OllamaEmbeddingService     │  │
+    │  │  • GET  /api/conversations                                         │  │
+    │  └───────────────────────────────────────────────────────────────────┘  │
+    └──────────┬────────────────────────────────────────────┬────────────────┘
+               │                                            │
+               │ SQL                                        │ HTTP (localhost)
+               ▼                                            ▼
+    ┌──────────────────────────────────┐    ┌─────────────────────────────────┐
+    │  PostgreSQL 18 + pgvector 0.8.6  │    │  Ollama                         │
+    │  ┌────────────────────────────┐  │    │  • Bielik 4.5B (LLM)            │
+    │  │ • documents (6 dok.)       │  │    │  • nomic-embed-text-v2-moe      │
+    │  │ • chunks (733 wektory)     │  │    │    (embeddingi 768-wymiarowe)   │
+    │  │ • conversations            │  │    └─────────────────────────────────┘
+    │  │ • messages                 │  │
+    │  └────────────────────────────┘  │
+    └──────────────────────────────────┘
+
+### Przepływ zapytania (RAG)
+
+1. Użytkownik wpisuje pytanie w aplikacji desktopowej.
+2. Aplikacja wysyła je do API (`POST /api/chat/stream`).
+3. API generuje embedding pytania przez **nomic-embed-text-v2-moe**.
+4. **pgvector** wyszukuje 2 najbliższe fragmenty dokumentów (podobieństwo kosinusowe).
+5. API buduje prompt z kontekstem i wysyła go do **Bielika 4.5B** przez Ollamę.
+6. Bielik generuje odpowiedź strumieniowo (słowo po słowie).
+7. API zwraca fragmenty przez **SSE** do aplikacji desktopowej.
+8. Aplikacja wyświetla odpowiedź oraz źródła z numerami `[1]`, `[2]`.
+
+### Stack technologiczny
+
+| Warstwa | Technologia | Wersja |
+|---|---|---|
+| **UI desktop** | Avalonia + CommunityToolkit.Mvvm | 12.1.2 |
+| **API** | ASP.NET Core (Minimal API) + Scalar | .NET 10 |
+| **Baza danych** | PostgreSQL + pgvector | 18.6 / 0.8.6 |
+| **ORM** | Entity Framework Core + Pgvector.EntityFrameworkCore | 10.0 |
+| **LLM** | Ollama + Bielik (SpeakLeash) | 4.5B Q4_K_M |
+| **Embeddingi** | nomic-embed-text-v2-moe | – |
+| **OCR** | Tesseract + PDFtoImage | 5.5.2 |
+| **PDF** | PdfOxide / QuestPDF | – |
+
+---
 
 ### Stack technologiczny
 

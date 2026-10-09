@@ -5,6 +5,20 @@ o dokumenty urzędowe (uchwały, regulaminy, ustawy) w języku naturalnym,
 cytując źródła. **Wszystkie dane pozostają na serwerze urzędu** – żadne 
 informacje nie są wysyłane do chmury.
 
+## 📸 Zrzuty ekranu
+
+### Główne okno – pytanie i odpowiedź z cytowaniem źródeł
+
+![Główne okno Asystenta Gminy](docs/screenshots/main-window.png)
+
+*Asystent odpowiada na pytanie o zadania wójta gminy, cytując konkretne fragmenty dokumentów źródłowych.*
+
+### Panel administracyjny – zarządzanie bazą wiedzy
+
+![Panel administracyjny z listą dokumentów](docs/screenshots/documents-panel.png)
+
+*Panel administracyjny umożliwia przeglądanie i usuwanie dokumentów z bazy wiedzy.*
+
 ---
 
 ## ✨ Funkcje
